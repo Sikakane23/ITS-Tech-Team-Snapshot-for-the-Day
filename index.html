@@ -47,13 +47,27 @@ function freshWeek(){return Object.fromEntries(NAMES.map(name=>[name,Array(5).fi
 function initialData(){const weeks={}; const first=freshWeek();
   // Initial known assignments are valid only for Thursday October 8, 2026.
   Object.entries({Jake:'pto',Scott:'sick',Narith:'offsite',Carter:'onsite',Alex:'offsite',Tony:'offsite'}).forEach(([name,status])=>first[name][3]=status);
+  // Friday October 9: Narith working from home; Jake and Tony on PTO.
+  Object.entries({Narith:'offsite',Jake:'pto',Tony:'pto'}).forEach(([name,status])=>first[name][4]=status);
   weeks['2026-10-05']=first;return {weeks,tickets:{...DEFAULT_TICKETS}};
 }
 function load(){try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved&&saved.weeks&&saved.tickets)return saved}catch(e){}const data=initialData();
   // Do not migrate broad weekly statuses: previous statuses did not specify dates.
   try{const legacy=JSON.parse(localStorage.getItem(LEGACY_KEY));if(legacy&&legacy.tickets)data.tickets={...DEFAULT_TICKETS,...legacy.tickets}}catch(e){}return data;
 }
-let state=load();let today=new Date(),mon=monday(today),currentWeek=weekKey(today),selectedDay=today.getDay()>=1&&today.getDay()<=5?today.getDay()-1:0;
+let state=load();
+// Apply this one-time Friday update to existing browser-saved schedules, too.
+// Afterwards, user edits can override it without being reset on page reload.
+const FRIDAY_PATCH_KEY='nhc_its_snapshot_friday_20261009_v1';
+try {
+  if(!localStorage.getItem(FRIDAY_PATCH_KEY)) {
+    if(!state.weeks['2026-10-05']) state.weeks['2026-10-05']=freshWeek();
+    Object.entries({Narith:'offsite',Jake:'pto',Tony:'pto'}).forEach(([name,status])=>state.weeks['2026-10-05'][name][4]=status);
+    localStorage.setItem(KEY,JSON.stringify(state));
+    localStorage.setItem(FRIDAY_PATCH_KEY,'1');
+  }
+} catch(e) {}
+let today=new Date(),mon=monday(today),currentWeek=weekKey(today),selectedDay=today.getDay()>=1&&today.getDay()<=5?today.getDay()-1:0;
 function schedule(){if(!state.weeks[currentWeek])state.weeks[currentWeek]=freshWeek();return state.weeks[currentWeek]}
 function header(){const fri=weekDay(mon,4);const fmt=d=>d.toLocaleDateString('en-US',{month:'long',day:'numeric'});el('weekLabel').textContent=`Week of ${fmt(mon)}–${fri.getDate()}, ${fri.getFullYear()}  •  Daily team coverage & service desk overview`;el('todayLabel').textContent=today.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});const select=el('viewDay');select.innerHTML=DAYS.map((d,i)=>`<option value="${i}">${d} · ${weekDay(mon,i).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</option>`).join('');select.value=String(selectedDay)}
 function memberCard(name,status){let badge=status==='onsite'?'● Onsite':status==='offsite'?'● Offsite':status==='pto'?'PTO':status==='sick'?'Out Sick':'Not assigned';let klass={onsite:'on',offsite:'off',pto:'pto',sick:'sick'}[status]||'pending';return `<article class="member"><img class="avatar" src="${PHOTOS[name]}" alt="Photo of ${name}"><strong>${name}</strong><span class="status ${klass}">${badge}</span></article>`}
