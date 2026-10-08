@@ -48,8 +48,8 @@ function freshWeek(){return Object.fromEntries(NAMES.map(name=>[name,Array(5).fi
 function initialData(){const weeks={}; const first=freshWeek();
   // Initial known assignments are valid only for Thursday October 8, 2026.
   Object.entries({Jake:'pto',Scott:'sick',Narith:'offsite',Carter:'onsite',Alex:'offsite',Tony:'offsite'}).forEach(([name,status])=>first[name][3]=status);
-  // Friday October 9: Narith working from home; Jake and Tony on PTO.
-  Object.entries({Narith:'offsite',Jake:'pto',Tony:'pto'}).forEach(([name,status])=>first[name][4]=status);
+  // Friday October 9: Narith onsite, Scott sick; Jake and Tony on PTO.
+  Object.entries({Narith:'onsite',Scott:'sick',Jake:'pto',Tony:'pto'}).forEach(([name,status])=>first[name][4]=status);
   weeks['2026-10-05']=first;return {weeks,tickets:{...DEFAULT_TICKETS}};
 }
 function load(){try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved&&saved.weeks&&saved.tickets)return saved}catch(e){}const data=initialData();
@@ -75,6 +75,17 @@ try {
     Object.entries({Narith:'offsite',Jake:'pto',Tony:'pto'}).forEach(([name,status])=>state.weeks['2026-10-05'][name][4]=status);
     localStorage.setItem(KEY,JSON.stringify(state));
     localStorage.setItem(FRIDAY_PATCH_KEY,'1');
+  }
+} catch(e) {}
+// One-time Friday correction: Narith onsite and Scott sick, preserving other assignments.
+const FRIDAY_CORRECTION_KEY='nhc_its_snapshot_friday_20261009_v2';
+try {
+  if(!localStorage.getItem(FRIDAY_CORRECTION_KEY)) {
+    if(!state.weeks['2026-10-05']) state.weeks['2026-10-05']=freshWeek();
+    state.weeks['2026-10-05'].Narith[4]='onsite';
+    state.weeks['2026-10-05'].Scott[4]='sick';
+    localStorage.setItem(KEY,JSON.stringify(state));
+    localStorage.setItem(FRIDAY_CORRECTION_KEY,'1');
   }
 } catch(e) {}
 let today=new Date(),mon=monday(today),currentWeek=weekKey(today),selectedDay=today.getDay()>=1&&today.getDay()<=5?today.getDay()-1:0;
