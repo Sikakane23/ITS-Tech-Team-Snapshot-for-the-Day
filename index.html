@@ -47,8 +47,8 @@ function freshWeek(){return Object.fromEntries(NAMES.map(name=>[name,Array(5).fi
 function initialData(){const weeks={}; const first=freshWeek();
   // Initial known assignments are valid only for Thursday October 8, 2026.
   Object.entries({Jake:'pto',Scott:'sick',Narith:'offsite',Carter:'onsite',Alex:'offsite',Tony:'offsite'}).forEach(([name,status])=>first[name][3]=status);
-  // Friday October 9: Narith onsite, Scott sick; Jake and Tony on PTO.
-  Object.entries({Narith:'onsite',Scott:'sick',Jake:'pto',Tony:'pto'}).forEach(([name,status])=>first[name][4]=status);
+  // Friday October 9: Narith onsite, Scott sick, Jake and Tony on PTO, Alex offsite.
+  Object.entries({Narith:'onsite',Scott:'sick',Jake:'pto',Tony:'pto',Alex:'offsite'}).forEach(([name,status])=>first[name][4]=status);
   weeks['2026-10-05']=first;return {weeks,tickets:{...DEFAULT_TICKETS}};
 }
 // Read-only published snapshot: no browser edits or local overrides.
