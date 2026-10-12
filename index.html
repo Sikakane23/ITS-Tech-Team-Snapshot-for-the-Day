@@ -103,8 +103,17 @@ function initialData(){const weeks={}; const first=freshWeek();
   Object.entries({Narith:'onsite',Scott:'sick',Jake:'pto',Tony:'pto',Alex:'offsite'}).forEach(([name,status])=>first[name][4]=status);
   first['Nick'][4]='onsite'; // Nick onsite Friday, October 9 only.
   weeks['2026-10-05']=first;
-  // Friday October 16, 2026: Narith is on PTO.
-  const following=freshWeek();following['Narith'][4]='pto';weeks['2026-10-12']=following;
+  // October 12–16: restore published schedule shown on the ITS monitor,
+  // retaining the newly requested Narith PTO on Friday October 16.
+  weeks['2026-10-12']={
+    Jake:  ['onsite','onsite','onsite','onsite','onsite'],
+    Scott: ['pto','pto','pto','pto','pto'],
+    Narith:['onsite','onsite','onsite','onsite','pto'],
+    Carter:['onsite','onsite','onsite','onsite','onsite'],
+    Alex:  ['offsite','onsite','onsite','onsite','onsite'],
+    Tony:  ['offsite','onsite','onsite','onsite','onsite'],
+    Nick:  ['onsite','offsite','onsite','onsite','onsite']
+  };
   return {weeks,tickets:{...DEFAULT_TICKETS}};
 }
 // Read-only published snapshot: no browser edits or local overrides.
