@@ -114,7 +114,7 @@ function initialData(){const weeks={}; const first=freshWeek();
   Object.entries({Narith:'onsite',Scott:'sick',Jake:'pto',Tony:'pto',Alex:'offsite'}).forEach(([name,status])=>first[name][4]=status);
   first['Nick'][4]='onsite'; // Nick onsite Friday, October 9 only.
   weeks['2026-10-05']=first;
-  // Week of October 12–16: Scott on PTO all week; Jake, Carter, and Narith onsite all week.
+  // Week of October 12–16: Scott on PTO all week; Jake, Carter, Narith, and Nick onsite all week.
   // Monday-only confirmed assignments for Alex and Tony remain intact.
   const next=freshWeek();
   for (let day=0; day<5; day++) {
@@ -122,6 +122,7 @@ function initialData(){const weeks={}; const first=freshWeek();
     next.Jake[day]='onsite';
     next.Carter[day]='onsite';
     next.Narith[day]='onsite';
+    next.Nick[day]='onsite';
   }
   Object.entries({Alex:'offsite',Tony:'offsite'}).forEach(([name,status])=>next[name][0]=status);
   weeks['2026-10-12']=next;
