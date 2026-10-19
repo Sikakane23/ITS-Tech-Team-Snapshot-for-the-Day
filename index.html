@@ -122,6 +122,17 @@ function initialData(){const weeks={}; const first=freshWeek();
     Tony:  ['offsite','offsite','onsite','onsite','onsite'],
     Nick:  ['onsite','onsite','onsite','onsite','onsite']
   };
+  // October 19–23, 2026: requested weekly and Monday-only coverage.
+  // Unconfirmed assignments use the normal onsite default; Nick remains unspecified.
+  weeks['2026-10-19']={
+    Jake:  ['onsite','onsite','onsite','onsite','onsite'],
+    Scott: ['pto','pto','pto','pto','pto'],
+    Narith:['pto','onsite','onsite','onsite','onsite'],
+    Carter:['onsite','onsite','onsite','onsite','onsite'],
+    Alex:  ['offsite','offsite','offsite','offsite','offsite'],
+    Tony:  ['onsite','onsite','onsite','onsite','onsite'],
+    Nick:  ['','','','','']
+  };
   return {weeks,tickets:{...DEFAULT_TICKETS}};
 }
 // Read-only published snapshot: no browser edits or local overrides.
