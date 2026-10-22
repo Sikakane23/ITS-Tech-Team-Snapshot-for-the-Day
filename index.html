@@ -122,6 +122,16 @@ function initialData(){const weeks={}; const first=freshWeek();
     Tony:  ['offsite','offsite','onsite','onsite','onsite'],
     Nick:  ['onsite','onsite','onsite','onsite','onsite']
   };
+  // October 19–23: restore published daily coverage; Nick's contract ended Oct 16.
+  weeks['2026-10-19']={
+    Jake:  ['onsite','onsite','onsite','onsite','onsite'],
+    Scott: ['pto','pto','pto','pto','pto'],
+    Narith:['pto','onsite','onsite','onsite','onsite'],
+    Carter:['onsite','onsite','offsite','onsite','onsite'],
+    Alex:  ['onsite','onsite','onsite','onsite','onsite'],
+    Tony:  ['onsite','onsite','offsite','pto','pto'],
+    Nick:  ['','','','','']
+  };
   return {weeks,tickets:{...DEFAULT_TICKETS}};
 }
 // Read-only published snapshot: no browser edits or local overrides.
@@ -130,11 +140,11 @@ let today=new Date(),mon=monday(today),currentWeek=weekKey(today),selectedDay=to
 function schedule(){if(!state.weeks[currentWeek])state.weeks[currentWeek]=freshWeek();return state.weeks[currentWeek]}
 function header(){const fri=weekDay(mon,4);const fmt=d=>d.toLocaleDateString('en-US',{month:'long',day:'numeric'});el('weekLabel').textContent=`Week of ${fmt(mon)}–${fri.getDate()}, ${fri.getFullYear()}  •  Daily team coverage & service desk overview`;el('todayLabel').textContent=today.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});const select=el('viewDay');select.innerHTML=DAYS.map((d,i)=>`<option value="${i}">${d} · ${weekDay(mon,i).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</option>`).join('');select.value=String(selectedDay)}
 function memberCard(name,status){let badge=status==='onsite'?'● Onsite':status==='offsite'?'● Offsite':status==='pto'?'PTO':status==='sick'?'Out Sick':'Not assigned';let klass={onsite:'on',offsite:'off',pto:'pto',sick:'sick'}[status]||'pending';return `<article class="member"><img class="avatar" src="${PHOTOS[name]}" alt="Photo of ${name}"><strong>${name}</strong><span class="status ${klass}">${badge}</span></article>`}
-function render(){const todayStatuses=Object.fromEntries(NAMES.map(n=>[n,schedule()[n][selectedDay]]));el('coverageDate').textContent=weekDay(mon,selectedDay).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
- ['onsite','offsite'].forEach(target=>{const assigned=NAMES.filter(n=>todayStatuses[n]===target);el(target).innerHTML=assigned.length?assigned.map(n=>memberCard(n,target)).join(''):'<div class="empty"><b>—</b><p>No team members scheduled</p></div>';el(target==='onsite'?'onCount':'offCount').textContent=`${assigned.length} teammate${assigned.length===1?'':'s'}`});
- const away=NAMES.filter(n=>['pto','sick'].includes(todayStatuses[n]));el('awaySection').style.display=away.length?'block':'none';el('awayCount').textContent=`${away.length} teammate${away.length===1?'':'s'}`;el('away').innerHTML=away.map(n=>memberCard(n,todayStatuses[n])).join('');
- const pending=NAMES.filter(n=>n!=='Nick'&&!['onsite','offsite','pto','sick'].includes(todayStatuses[n]));el('pending').style.display=pending.length?'flex':'none';el('pending').innerHTML='<strong>AWAITING DAILY ASSIGNMENT</strong>'+pending.map(n=>`<span class="pending-chip"><img src="${PHOTOS[n]}" alt="">${n}</span>`).join('');
- const grid=el('weeklyGrid');grid.innerHTML='<div class="grid-hdr">Team member</div>'+DAYS.map((d,i)=>`<button class="grid-day ${i===selectedDay?'active':''}" data-day="${i}" type="button">${d}<small>${weekDay(mon,i).getDate()}</small></button>`).join('')+NAMES.map(n=>`<div class="grid-name"><img src="${PHOTOS[n]}" alt="">${n}</div>`+schedule()[n].map((status,i)=>`<button type="button" class="grid-status ${status} ${i===selectedDay?'selected':''}" data-day="${i}" title="View ${DAYS[i]}: ${n} ${status}">${status==='sick'?'Sick':status==='pto'?'PTO':status==='offsite'?'Offsite':status==='onsite'?'Onsite':'—'}</button>`).join('')).join('');
+function render(){const activeNames=currentWeek>='2026-10-19'?NAMES.filter(n=>n!=='Nick'):NAMES;const todayStatuses=Object.fromEntries(activeNames.map(n=>[n,schedule()[n][selectedDay]]));el('coverageDate').textContent=weekDay(mon,selectedDay).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+ ['onsite','offsite'].forEach(target=>{const assigned=activeNames.filter(n=>todayStatuses[n]===target);el(target).innerHTML=assigned.length?assigned.map(n=>memberCard(n,target)).join(''):'<div class="empty"><b>—</b><p>No team members scheduled</p></div>';el(target==='onsite'?'onCount':'offCount').textContent=`${assigned.length} teammate${assigned.length===1?'':'s'}`});
+ const away=activeNames.filter(n=>['pto','sick'].includes(todayStatuses[n]));el('awaySection').style.display=away.length?'block':'none';el('awayCount').textContent=`${away.length} teammate${away.length===1?'':'s'}`;el('away').innerHTML=away.map(n=>memberCard(n,todayStatuses[n])).join('');
+ const pending=activeNames.filter(n=>n!=='Nick'&&!['onsite','offsite','pto','sick'].includes(todayStatuses[n]));el('pending').style.display=pending.length?'flex':'none';el('pending').innerHTML='<strong>AWAITING DAILY ASSIGNMENT</strong>'+pending.map(n=>`<span class="pending-chip"><img src="${PHOTOS[n]}" alt="">${n}</span>`).join('');
+ const grid=el('weeklyGrid');grid.innerHTML='<div class="grid-hdr">Team member</div>'+DAYS.map((d,i)=>`<button class="grid-day ${i===selectedDay?'active':''}" data-day="${i}" type="button">${d}<small>${weekDay(mon,i).getDate()}</small></button>`).join('')+activeNames.map(n=>`<div class="grid-name"><img src="${PHOTOS[n]}" alt="">${n}</div>`+schedule()[n].map((status,i)=>`<button type="button" class="grid-status ${status} ${i===selectedDay?'selected':''}" data-day="${i}" title="View ${DAYS[i]}: ${n} ${status}">${status==='sick'?'Sick':status==='pto'?'PTO':status==='offsite'?'Offsite':status==='onsite'?'Onsite':'—'}</button>`).join('')).join('');
  grid.querySelectorAll('[data-day]').forEach(btn=>btn.addEventListener('click',()=>{selectedDay=Number(btn.dataset.day);el('viewDay').value=String(selectedDay);render()}));
  const total=Object.values(state.tickets).reduce((a,b)=>a+Number(b),0);el('total').textContent=total.toLocaleString();el('donutTotal').textContent=total.toLocaleString();el('priorityRows').innerHTML=Object.entries(state.tickets).map(([name,val])=>`<div class="priority-row"><div class="pname"><i class="swatch" style="background:${COLORS[name]}"></i><span>${name}</span></div><b>${Number(val).toLocaleString()}</b></div>`).join('');let cumulative=0;const gradient=Object.entries(state.tickets).map(([name,val])=>{const start=cumulative;cumulative+=(total?Number(val)/total:0)*100;return `${COLORS[name]} ${start}% ${cumulative}%`}).join(',');el('donut').style.background=total?`conic-gradient(${gradient})`:'#dce7ef';
 }
