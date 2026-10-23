@@ -1,121 +1,99 @@
 #!/usr/bin/env python3
-"""Read-only Freshservice diagnostics: ticket filters and safe status-field metadata."""
+"""Read-only Freshservice count verification; does not publish or alter tickets.
+
+Matches the shared 'Open Tickets by Tech Team' view by assignee (six agents
+plus unassigned), six unresolved status IDs, and a rolling six-month window.
+Prints aggregate priority totals only. GitHub Actions supplies API key in secret.
+"""
 import base64
 import json
 import os
+import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 DOMAIN = 'northfieldhospitalhelpdesk.freshservice.com'
+AGENTS = {
+    'Carter': '31000582795', 'Alex': '31000589835',
+    'Jake': '31000569854', 'Narith': '31000569666',
+    'Scott': '31000567881', 'Tony': '31000054955',
+    'Unassigned': None,
+}
+PRIORITY_IDS = {'Urgent': 4, 'High': 3, 'Medium': 2, 'Low': 1}
+EXPECTED_STATUSES = {'2', '3', '6', '7', '8', '9'}
 KEY = os.getenv('FRESHSERVICE_API_KEY', '').strip()
-AGENTS = ['31000582795', '31000589835', '31000569854', '31000569666', '31000567881', '31000054955']
+STATUSES = {s.strip() for s in os.getenv('FRESHSERVICE_UNRESOLVED_STATUSES', '').split(',') if s.strip()}
 if not KEY:
-    raise SystemExit('Missing FRESHSERVICE_API_KEY secret')
-AUTH = 'Basic ' + base64.b64encode((KEY + ':X').encode()).decode('ascii')
+    sys.exit('ERROR: FRESHSERVICE_API_KEY secret is missing.')
+if STATUSES != EXPECTED_STATUSES:
+    sys.exit('ERROR: Set FRESHSERVICE_UNRESOLVED_STATUSES to 2,3,6,7,8,9 before running.')
+
+# Freshservice view uses a calendar six-month lookback, not 183 days.
+def months_ago(date, months):
+    year = date.year
+    month = date.month - months
+    while month < 1:
+        month += 12
+        year -= 1
+    import calendar
+    day = min(date.day, calendar.monthrange(year, month)[1])
+    return date.replace(year=year, month=month, day=day)
+
+cutoff = months_ago(datetime.now(timezone.utc), 6).strftime('%Y-%m-%d')
+status_clause = '(' + ' OR '.join(f'status:{s}' for s in sorted(STATUSES, key=int)) + ')'
+auth = 'Basic ' + base64.b64encode((KEY + ':X').encode()).decode('ascii')
 
 
-def get(path, params=None):
-    url = 'https://' + DOMAIN + path
-    if params:
-        url += '?' + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={'Authorization': AUTH, 'Accept': 'application/json'})
-    with urllib.request.urlopen(req, timeout=30) as response:
-        return json.load(response)
+def count(expression):
+    params = urllib.parse.urlencode({'query': '"' + expression + '"', 'page': 1})
+    url = f'https://{DOMAIN}/api/v2/tickets/filter?{params}'
+    req = urllib.request.Request(url, headers={'Authorization': auth, 'Accept': 'application/json'})
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=35) as response:
+                data = json.load(response)
+            result = data.get('total') if isinstance(data, dict) else None
+            if not isinstance(result, int):
+                raise ValueError('API response missing integer total')
+            return result
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429 and attempt < 2:
+                time.sleep(4 * (attempt + 1))
+                continue
+            # Print no raw response body (may include sensitive information).
+            raise RuntimeError(f'Freshservice HTTP {exc.code}; inspect filter syntax or API permissions') from None
+        except urllib.error.URLError:
+            raise RuntimeError('Freshservice connection failed') from None
 
+print('Freshservice ticket count verification (read-only)', flush=True)
+print(f'Created on/after: {cutoff} UTC (rolling six calendar months)', flush=True)
+print('Statuses included: 2,3,6,7,8,9; Resolved 4 and Closed 5 excluded.', flush=True)
+print('Agents: six named ITS technicians plus Unassigned.', flush=True)
+print('Priority counts are computed from mutually exclusive agent and priority filters.', flush=True)
 
-def probe(label, expression):
-    try:
-        obj = get('/api/v2/tickets/filter', {'query': '"' + expression + '"', 'page': 1})
-        print(f'{label}: HTTP 200; total={obj.get("total", "not supplied")}', flush=True)
-    except urllib.error.HTTPError as ex:
-        print(f'{label}: HTTP {ex.code}', flush=True)
-    except Exception as ex:
-        print(f'{label}: {type(ex).__name__}', flush=True)
-
-
-def find_status_field(obj):
-    if isinstance(obj, dict):
-        if str(obj.get('name', '')).lower() == 'status' or str(obj.get('label', '')).lower() == 'status':
-            return obj
-        for value in obj.values():
-            result = find_status_field(value)
-            if result is not None:
-                return result
-    elif isinstance(obj, list):
-        for item in obj:
-            result = find_status_field(item)
-            if result is not None:
-                return result
-    return None
-
-
-def inspect_choice_tree(node, depth=0):
-    """Print limited status option labels/IDs, never ticket content."""
-    if depth > 5:
-        return 0
-    found = 0
-    if isinstance(node, list):
-        for item in node[:100]:
-            found += inspect_choice_tree(item, depth + 1)
-    elif isinstance(node, dict):
-        label = next((node[k] for k in ('label', 'name', 'display_name', 'text') if isinstance(node.get(k), str)), None)
-        value = next((node[k] for k in ('value', 'id', 'code', 'status_id') if isinstance(node.get(k), (int, str))), None)
-        if label and value is not None:
-            print(f'  Choice: {str(label)[:65]} | value={str(value)[:30]}', flush=True)
-            found += 1
-        for k, v in node.items():
-            if isinstance(v, (list, dict)):
-                found += inspect_choice_tree(v, depth + 1)
-    return found
-
-
-print('Freshservice read-only status diagnostics (no ticket records or secrets printed)', flush=True)
-probe('1. Priority baseline', 'priority:1')
-probe('2. Open status', 'status:2')
-probe('3. Pending status', 'status:3')
-probe('4. One team agent', 'agent_id:' + AGENTS[0])
-probe('5. Unassigned', 'agent_id:null')
-cutoff = (datetime.now(timezone.utc) - timedelta(days=183)).strftime('%Y-%m-%d')
-probe('6. Created in last ~6 months', "created_at:>'" + cutoff + "'")
-probe('7. Combined status and agent', '(status:2 OR status:3) AND (agent_id:' + AGENTS[0] + ' OR agent_id:null)')
-print('8. Inspect Status field choices and sections (structure only):', flush=True)
+totals = {p: 0 for p in PRIORITY_IDS}
 try:
-    obj = get('/api/v2/ticket_form_fields')
-    field = find_status_field(obj)
-    if field is None:
-        print('  Status field not found in ticket_form_fields.', flush=True)
-    else:
-        print('  Status field ID: ' + str(field.get('id', 'not supplied')), flush=True)
-        def describe(obj, prefix, depth=0):
-            """Inspect metadata keys and nested primitive structure without dumping raw data."""
-            if depth > 5: return
-            if isinstance(obj, list):
-                print(f'  {prefix}: list length={len(obj)}', flush=True)
-                for i, item in enumerate(obj[:12]):
-                    describe(item, f'{prefix}[{i}]', depth+1)
-            elif isinstance(obj, dict):
-                print(f'  {prefix}: object keys={",".join(sorted(obj.keys()))[:500]}', flush=True)
-                # Only emit primitive values for tightly-scoped, status-related metadata
-                for key in ('id','value','code','status_id','label','name','display_name','text'):
-                    v = obj.get(key)
-                    if isinstance(v, (str,int,float,bool)):
-                        print(f'    {key}={str(v)[:80]}', flush=True)
-                for key, v in obj.items():
-                    if isinstance(v, (dict,list)):
-                        describe(v, f'{prefix}.{key}', depth+1)
-            else:
-                print(f'  {prefix}: {type(obj).__name__}', flush=True)
-        for key in ('choices','sections'):
-            if key in field:
-                describe(field[key], 'status.'+key)
-            else:
-                print('  status.'+key+' missing', flush=True)
-except urllib.error.HTTPError as ex:
-    print(f'  Ticket form fields HTTP {ex.code}', flush=True)
-except Exception as ex:
-    print(f'  Ticket form fields error: {type(ex).__name__}', flush=True)
-print('Diagnostic complete. No Freshservice tickets or dashboard files modified.', flush=True)
+    for name, agent_id in AGENTS.items():
+        agent_clause = 'agent_id:null' if agent_id is None else f'agent_id:{agent_id}'
+        per_agent = {}
+        for priority, p_id in PRIORITY_IDS.items():
+            expression = f'{status_clause} AND {agent_clause} AND created_at:>\'{cutoff}\' AND priority:{p_id}'
+            per_agent[priority] = count(expression)
+            totals[priority] += per_agent[priority]
+        print(f'{name}: {sum(per_agent.values())} (aggregate count only)', flush=True)
+except (RuntimeError, ValueError) as exc:
+    print(f'VERIFICATION FAILED: {exc}', flush=True)
+    print('No dashboard changes were made.', flush=True)
+    sys.exit(1)
+
+print('--- ITS Team Unresolved Ticket Snapshot ---', flush=True)
+for label, n in totals.items():
+    print(f'{label}: {n}', flush=True)
+print(f'Total Unresolved: {sum(totals.values())}', flush=True)
+print('Compare to Freshservice Open Tickets by Tech Team. No dashboard changes were made.', flush=True)
+
 
 
