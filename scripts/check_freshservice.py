@@ -1,99 +1,55 @@
 #!/usr/bin/env python3
-"""Read-only Freshservice count verification; does not publish or alter tickets.
-
-Matches the shared 'Open Tickets by Tech Team' view by assignee (six agents
-plus unassigned), six unresolved status IDs, and a rolling six-month window.
-Prints aggregate priority totals only. GitHub Actions supplies API key in secret.
-"""
-import base64
-import json
-import os
-import sys
-import time
-import urllib.error
-import urllib.parse
-import urllib.request
+"""Read-only Freshservice filter isolation. Outputs aggregate counts only; no ticket records."""
+import base64, calendar, json, os, time, urllib.error, urllib.parse, urllib.request
 from datetime import datetime, timezone
 
 DOMAIN = 'northfieldhospitalhelpdesk.freshservice.com'
-AGENTS = {
-    'Carter': '31000582795', 'Alex': '31000589835',
-    'Jake': '31000569854', 'Narith': '31000569666',
-    'Scott': '31000567881', 'Tony': '31000054955',
-    'Unassigned': None,
-}
-PRIORITY_IDS = {'Urgent': 4, 'High': 3, 'Medium': 2, 'Low': 1}
-EXPECTED_STATUSES = {'2', '3', '6', '7', '8', '9'}
 KEY = os.getenv('FRESHSERVICE_API_KEY', '').strip()
-STATUSES = {s.strip() for s in os.getenv('FRESHSERVICE_UNRESOLVED_STATUSES', '').split(',') if s.strip()}
 if not KEY:
-    sys.exit('ERROR: FRESHSERVICE_API_KEY secret is missing.')
-if STATUSES != EXPECTED_STATUSES:
-    sys.exit('ERROR: Set FRESHSERVICE_UNRESOLVED_STATUSES to 2,3,6,7,8,9 before running.')
+    raise SystemExit('Missing FRESHSERVICE_API_KEY GitHub secret')
+HEADERS = {'Authorization': 'Basic '+base64.b64encode((KEY+':X').encode()).decode(), 'Accept':'application/json'}
+AGENTS = {'Carter':'31000582795','Alex':'31000589835','Jake':'31000569854',
+          'Narith':'31000569666','Scott':'31000567881','Tony':'31000054955',
+          'Unassigned':None}
+STATUSES = sorted({int(s.strip()) for s in os.getenv('FRESHSERVICE_UNRESOLVED_STATUSES','2,3,6,7,8,9').split(',') if s.strip()})
 
-# Freshservice view uses a calendar six-month lookback, not 183 days.
-def months_ago(date, months):
-    year = date.year
-    month = date.month - months
-    while month < 1:
-        month += 12
-        year -= 1
-    import calendar
-    day = min(date.day, calendar.monthrange(year, month)[1])
-    return date.replace(year=year, month=month, day=day)
+def six_months_ago():
+    today = datetime.now(timezone.utc).date()
+    y, m = today.year, today.month - 6
+    if m <= 0: y, m = y-1, m+12
+    return f'{y:04d}-{m:02d}-{min(today.day,calendar.monthrange(y,m)[1]):02d}'
 
-cutoff = months_ago(datetime.now(timezone.utc), 6).strftime('%Y-%m-%d')
-status_clause = '(' + ' OR '.join(f'status:{s}' for s in sorted(STATUSES, key=int)) + ')'
-auth = 'Basic ' + base64.b64encode((KEY + ':X').encode()).decode('ascii')
-
-
-def count(expression):
-    params = urllib.parse.urlencode({'query': '"' + expression + '"', 'page': 1})
-    url = f'https://{DOMAIN}/api/v2/tickets/filter?{params}'
-    req = urllib.request.Request(url, headers={'Authorization': auth, 'Accept': 'application/json'})
-    for attempt in range(3):
+def count(label, query):
+    url = 'https://'+DOMAIN+'/api/v2/tickets/filter?'+urllib.parse.urlencode({'query':'"'+query+'"','page':1})
+    req=urllib.request.Request(url, headers=HEADERS)
+    try:
+        with urllib.request.urlopen(req,timeout=30) as res: payload=json.load(res)
+        total=payload.get('total')
+        print(f'{label}: HTTP 200, total={total}',flush=True)
+    except urllib.error.HTTPError as exc:
+        field=code=''
         try:
-            with urllib.request.urlopen(req, timeout=35) as response:
-                data = json.load(response)
-            result = data.get('total') if isinstance(data, dict) else None
-            if not isinstance(result, int):
-                raise ValueError('API response missing integer total')
-            return result
-        except urllib.error.HTTPError as exc:
-            if exc.code == 429 and attempt < 2:
-                time.sleep(4 * (attempt + 1))
-                continue
-            # Print no raw response body (may include sensitive information).
-            raise RuntimeError(f'Freshservice HTTP {exc.code}; inspect filter syntax or API permissions') from None
-        except urllib.error.URLError:
-            raise RuntimeError('Freshservice connection failed') from None
+            err=json.loads(exc.read(4096))
+            fields=err.get('errors',[])
+            if fields: field=str(fields[0].get('field',''))[:40];code=str(fields[0].get('code',''))[:40]
+        except Exception: pass
+        print(f'{label}: HTTP {exc.code}, field={field or "unknown"}, code={code or "unknown"}',flush=True)
+    except Exception as exc:
+        print(f'{label}: error={type(exc).__name__}',flush=True)
 
-print('Freshservice ticket count verification (read-only)', flush=True)
-print(f'Created on/after: {cutoff} UTC (rolling six calendar months)', flush=True)
-print('Statuses included: 2,3,6,7,8,9; Resolved 4 and Closed 5 excluded.', flush=True)
-print('Agents: six named ITS technicians plus Unassigned.', flush=True)
-print('Priority counts are computed from mutually exclusive agent and priority filters.', flush=True)
-
-totals = {p: 0 for p in PRIORITY_IDS}
-try:
-    for name, agent_id in AGENTS.items():
-        agent_clause = 'agent_id:null' if agent_id is None else f'agent_id:{agent_id}'
-        per_agent = {}
-        for priority, p_id in PRIORITY_IDS.items():
-            expression = f'{status_clause} AND {agent_clause} AND created_at:>\'{cutoff}\' AND priority:{p_id}'
-            per_agent[priority] = count(expression)
-            totals[priority] += per_agent[priority]
-        print(f'{name}: {sum(per_agent.values())} (aggregate count only)', flush=True)
-except (RuntimeError, ValueError) as exc:
-    print(f'VERIFICATION FAILED: {exc}', flush=True)
-    print('No dashboard changes were made.', flush=True)
-    sys.exit(1)
-
-print('--- ITS Team Unresolved Ticket Snapshot ---', flush=True)
-for label, n in totals.items():
-    print(f'{label}: {n}', flush=True)
-print(f'Total Unresolved: {sum(totals.values())}', flush=True)
-print('Compare to Freshservice Open Tickets by Tech Team. No dashboard changes were made.', flush=True)
-
-
-
+print('Freshservice ASSIGNEE filter diagnostics (read-only; counts only)',flush=True)
+print('No dashboard updates and no ticket records printed.',flush=True)
+for name,aid in AGENTS.items():
+    count('Agent only - '+name, 'agent_id:null' if aid is None else 'agent_id:'+aid)
+status_clause='('+' OR '.join(f'status:{s}' for s in STATUSES)+')'
+cutoff=six_months_ago()
+print('Statuses configured: '+','.join(map(str,STATUSES))+'; six-month cutoff: '+cutoff,flush=True)
+count('Unresolved statuses only',status_clause)
+count('Created in last 6 months only',"created_at:>'"+cutoff+"'")
+for name in ('Carter','Alex','Unassigned'):
+    aid=AGENTS[name]
+    ac='agent_id:null' if aid is None else 'agent_id:'+aid
+    count(name+' + unresolved statuses', ac+' AND '+status_clause)
+    count(name+' + recent creation', ac+" AND created_at:>'"+cutoff+"'")
+    count(name+' + both filters', ac+' AND '+status_clause+" AND created_at:>'"+cutoff+"'")
+print('Done. Compare diagnostic totals with Freshservice. No changes made.',flush=True)
