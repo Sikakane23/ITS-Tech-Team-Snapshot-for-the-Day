@@ -80,22 +80,38 @@ probe('5. Unassigned', 'agent_id:null')
 cutoff = (datetime.now(timezone.utc) - timedelta(days=183)).strftime('%Y-%m-%d')
 probe('6. Created in last ~6 months', "created_at:>'" + cutoff + "'")
 probe('7. Combined status and agent', '(status:2 OR status:3) AND (agent_id:' + AGENTS[0] + ' OR agent_id:null)')
-print('8. Fetch Status field definition:', flush=True)
+print('8. Inspect Status field choices and sections (structure only):', flush=True)
 try:
     obj = get('/api/v2/ticket_form_fields')
     field = find_status_field(obj)
     if field is None:
-        print('  Status field not found. Top-level structure: ' + (','.join(obj.keys()) if isinstance(obj, dict) else type(obj).__name__), flush=True)
+        print('  Status field not found in ticket_form_fields.', flush=True)
     else:
         print('  Status field ID: ' + str(field.get('id', 'not supplied')), flush=True)
-        print('  Status field property names: ' + ', '.join(sorted(field.keys())), flush=True)
-        count = 0
-        for key in ('choices', 'options', 'dropdown_choices', 'field_options', 'values', 'statuses', 'ticket_statuses'):
+        def describe(obj, prefix, depth=0):
+            """Inspect metadata keys and nested primitive structure without dumping raw data."""
+            if depth > 5: return
+            if isinstance(obj, list):
+                print(f'  {prefix}: list length={len(obj)}', flush=True)
+                for i, item in enumerate(obj[:12]):
+                    describe(item, f'{prefix}[{i}]', depth+1)
+            elif isinstance(obj, dict):
+                print(f'  {prefix}: object keys={",".join(sorted(obj.keys()))[:500]}', flush=True)
+                # Only emit primitive values for tightly-scoped, status-related metadata
+                for key in ('id','value','code','status_id','label','name','display_name','text'):
+                    v = obj.get(key)
+                    if isinstance(v, (str,int,float,bool)):
+                        print(f'    {key}={str(v)[:80]}', flush=True)
+                for key, v in obj.items():
+                    if isinstance(v, (dict,list)):
+                        describe(v, f'{prefix}.{key}', depth+1)
+            else:
+                print(f'  {prefix}: {type(obj).__name__}', flush=True)
+        for key in ('choices','sections'):
             if key in field:
-                print(f'  Inspecting {key}:', flush=True)
-                count += inspect_choice_tree(field[key])
-        if count == 0:
-            print('  No choice IDs found in the usual properties. Field metadata may use a different structure or endpoint.', flush=True)
+                describe(field[key], 'status.'+key)
+            else:
+                print('  status.'+key+' missing', flush=True)
 except urllib.error.HTTPError as ex:
     print(f'  Ticket form fields HTTP {ex.code}', flush=True)
 except Exception as ex:
