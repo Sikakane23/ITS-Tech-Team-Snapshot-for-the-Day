@@ -1,0 +1,18 @@
+name: Verify Freshservice ticket counts
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify ticket counts (read-only)
+        env:
+          FRESHSERVICE_API_KEY: ${{ secrets.FRESHSERVICE_API_KEY }}
+          FRESHSERVICE_AGENT_IDS: "31000582795,31000589835,31000569854,31000569666,31000567881,31000054955"
+          FRESHSERVICE_UNRESOLVED_STATUSES: ${{ vars.FRESHSERVICE_UNRESOLVED_STATUSES }}
+          FRESHSERVICE_WORKSPACE_ID: ${{ vars.FRESHSERVICE_WORKSPACE_ID }}
+        run: python3 scripts/check_freshservice.py
