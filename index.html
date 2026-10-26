@@ -132,14 +132,14 @@ function initialData(){const weeks={}; const first=freshWeek();
     Tony:  ['onsite','onsite','offsite','pto','pto'],
     Nick:  ['','','','','']
   };
-  // October 26–30: Monday coverage confirmed; rest of week awaiting assignments.
+  // October 26–30: daily coverage confirmed; Scott offsite Thursday and Friday.
   weeks['2026-10-26']={
-    Jake:  ['onsite','','','',''],
-    Scott: ['onsite','','','',''],
-    Narith:['onsite','','','',''],
-    Carter:['pto','','','',''],
-    Alex:  ['sick','','','',''],
-    Tony:  ['offsite','','','',''],
+    Jake:  ['onsite','onsite','onsite','onsite','onsite'],
+    Scott: ['onsite','onsite','onsite','offsite','offsite'],
+    Narith:['onsite','offsite','onsite','onsite','offsite'],
+    Carter:['pto','onsite','onsite','onsite','onsite'],
+    Alex:  ['sick','onsite','onsite','onsite','onsite'],
+    Tony:  ['offsite','offsite','onsite','onsite','onsite'],
     Nick:  ['','','','','']
   };
   return {weeks,tickets:{...DEFAULT_TICKETS}};
