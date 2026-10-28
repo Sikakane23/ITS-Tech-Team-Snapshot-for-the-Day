@@ -182,6 +182,8 @@ async function refreshTicketSnapshot(){
   }
   window.__hadTicketSnapshot=true;
 }
-// Automatic Freshservice synchronization paused: manual ticket snapshot only.
-document.getElementById('ticketSyncStatus').textContent='Manual ticket snapshot · automatic sync paused';
+// Load published aggregate counts when available. Keep the manual snapshot as fallback.
+refreshTicketSnapshot();
+// Recheck published data every five minutes; GitHub Actions publishes approximately every 15 minutes.
+setInterval(refreshTicketSnapshot, 5 * 60 * 1000);
 </script></body></html>
