@@ -142,6 +142,12 @@ function initialData(){const weeks={}; const first=freshWeek();
     Tony:  ['offsite','offsite','onsite','onsite','onsite'],
     Nick:  ['','','','','']
   };
+  // November 2–6, 2026: confirmed Scott and Tony coverage; other team members retain standard weekly defaults until updated.
+  weeks['2026-11-02']={
+    ...freshWeek(),
+    Scott: ['offsite','offsite','onsite','onsite','pto'],
+    Tony:  ['onsite','onsite','offsite','offsite','pto']
+  };
   return {weeks,tickets:{...DEFAULT_TICKETS}};
 }
 // Read-only published snapshot: no browser edits or local overrides.
