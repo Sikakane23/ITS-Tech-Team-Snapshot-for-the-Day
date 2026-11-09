@@ -150,6 +150,14 @@ function initialData(){const weeks={}; const first=freshWeek();
     Scott: ['offsite','offsite','onsite','onsite','pto'],
     Tony:  ['onsite','onsite','offsite','pto','pto']
   };
+  // November 9–13, 2026: confirmed coverage changes.
+  // 'offsite' is presented as WFH in the dashboard; previous weeks remain unchanged.
+  weeks['2026-11-09']={
+    ...freshWeek(),
+    Narith: ['onsite','onsite','onsite','onsite','offsite'],
+    Tony:   ['onsite','offsite','onsite','onsite','onsite'],
+    Scott:  ['onsite','onsite','offsite','offsite','offsite']
+  };
   return {weeks,tickets:{...DEFAULT_TICKETS}};
 }
 // Read-only published snapshot: no browser edits or local overrides.
