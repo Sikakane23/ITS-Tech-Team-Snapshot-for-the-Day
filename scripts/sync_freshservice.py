@@ -54,11 +54,15 @@ def main():
     status_expr='('+' OR '.join('status:'+x for x in statuses)+')'
     date_expr="created_at:>'"+cutoff()+"'"
     counts={x:0 for x in PRIORITIES}
+    unassigned=0
     for person,user_id in RESPONDERS.items():
         agent='agent_id:null' if user_id is None else 'agent_id:'+user_id
         for priority,number in PRIORITIES.items():
             expr=agent+' AND '+status_expr+' AND '+date_expr+' AND priority:'+str(number)
-            counts[priority]+=count(expr,auth)
+            value=count(expr,auth)
+            counts[priority]+=value
+            if person=='Unassigned':
+                unassigned+=value
             time.sleep(.15)
     total=sum(counts.values())
     if total<1: raise SystemExit('Refusing to publish zero tickets without review')
@@ -69,9 +73,10 @@ def main():
                 raise SystemExit('Refusing to publish suspicious decrease of over 50%')
         except (ValueError,TypeError,OSError):
             raise SystemExit('Existing snapshot unreadable; publication stopped')
-    payload={'total':total,'priorities':counts,'updated_at':dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds').replace('+00:00','Z'),
+    payload={'total':total,'priorities':counts,'unassigned':unassigned,'updated_at':dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds').replace('+00:00','Z'),
              'source':'Freshservice Open Tickets by Tech Team (API approximation)'}
     OUTPUT.write_text(json.dumps(payload,indent=2)+'\n')
     print('Aggregate snapshot verified:', 'total='+str(total), ', '.join(f'{p}={n}' for p,n in counts.items()))
 
 if __name__=='__main__':main()
+
