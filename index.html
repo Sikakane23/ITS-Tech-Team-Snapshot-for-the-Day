@@ -164,6 +164,13 @@ function initialData(){const weeks={}; const first=freshWeek();
     Tony:   ['onsite','offsite','onsite','offsite','onsite'],
     Scott:  ['onsite','onsite','offsite','offsite','offsite']
   };
+  // November 16–20, 2026: Narith WFH Monday and Tuesday; Alex WFH Monday.
+  // 'offsite' is displayed as WFH; all other assignments default to Onsite.
+  weeks['2026-11-16']={
+    ...freshWeek(),
+    Narith: ['offsite','offsite','onsite','onsite','onsite'],
+    Alex:   ['offsite','onsite','onsite','onsite','onsite']
+  };
   return {weeks,tickets:{...DEFAULT_TICKETS}};
 }
 // Read-only published snapshot: no browser edits or local overrides.
