@@ -173,6 +173,17 @@ function initialData(){const weeks={}; const first=freshWeek();
     Scott:  ['offsite','onsite','onsite','onsite','onsite'],
     Tony:   ['onsite','onsite','offsite','offsite','offsite']
   };
+  // November 23–27, 2026: Thanksgiving week. OOO for all team members on Thursday.
+  // The existing 'offsite' and 'pto' internal statuses render as WFH and OOO.
+  weeks['2026-11-23']={
+    ...freshWeek(),
+    Jake:   ['onsite','onsite','onsite','pto','pto'],
+    Scott:  ['onsite','onsite','pto','pto','pto'],
+    Narith: ['onsite','onsite','offsite','pto','offsite'],
+    Carter: ['onsite','onsite','onsite','pto','onsite'],
+    Alex:   ['offsite','onsite','onsite','pto','onsite'],
+    Tony:   ['offsite','offsite','onsite','pto','pto']
+  };
   return {weeks,tickets:{...DEFAULT_TICKETS}};
 }
 // Read-only published snapshot: no browser edits or local overrides.
