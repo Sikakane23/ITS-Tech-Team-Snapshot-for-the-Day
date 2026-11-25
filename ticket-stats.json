@@ -1,12 +1,12 @@
 {
-  "total": 286,
+  "total": 279,
   "priorities": {
     "Urgent": 0,
-    "High": 29,
-    "Medium": 10,
-    "Low": 247
+    "High": 32,
+    "Medium": 11,
+    "Low": 236
   },
-  "unassigned": 24,
-  "updated_at": "2026-11-25T08:52:14Z",
+  "unassigned": 14,
+  "updated_at": "2026-11-25T18:56:50Z",
   "source": "Freshservice Open Tickets by Tech Team (API approximation)"
 }
